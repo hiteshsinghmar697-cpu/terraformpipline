@@ -1,0 +1,67 @@
+name: Terraform Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform Action to execute (plan, apply, destroy)'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+jobs:
+  terraform:
+    name: Terraform Pipeline
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: ./envirment/prod
+        shell: powershell
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Azure Login Status
+        run: |
+          Write-Host "Verifying Azure CLI session..."
+          az account show
+
+      - name: Terraform Init
+        run: |
+          Write-Host "Initializing Terraform..."
+          terraform init
+
+      - name: Terraform Format & Validate
+        run: |
+          Write-Host "Validating Terraform configuration..."
+          terraform fmt -check=false
+          terraform validate
+
+      - name: Terraform Plan
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan') || (github.event_name == 'push') }}
+        run: |
+          Write-Host "Running Terraform Plan..."
+          terraform plan
+
+      - name: Terraform Apply
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply' }}
+        run: |
+          Write-Host "Running Terraform Apply..."
+          terraform apply -auto-approve
+
+      - name: Terraform Destroy
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy' }}
+        run: |
+          Write-Host "Running Terraform Destroy..."
+          terraform destroy -auto-approve
