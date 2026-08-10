@@ -1,9 +1,7 @@
-variable "vnets" {}
-
 resource "azurerm_virtual_network" "hitesh" {
-  for_each = var.vnets
-  name = each.value.name
-  location = each.value.location
+  for_each            = var.vnets
+  name                = each.value.name
+  location            = each.value.location
   resource_group_name = each.value.resource_group_name
-  address_space = each.value.address_space
+  address_space       = each.value.address_space
 }

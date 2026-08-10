@@ -51,6 +51,6 @@ vms = {
     size                = "Standard_D4_v5"
     admin_username      = "adminhitesh"
     admin_password      = "password@123"
-    nic = "nic-prod-danger"
+    nic                 = "nic-prod-danger"
   }
 }
