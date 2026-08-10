@@ -9,6 +9,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      login_method:
+        description: 'Azure Login Method'
+        required: true
+        default: 'device_code'
+        type: choice
+        options:
+          - device_code
+          - secrets
 
 jobs:
   terraform-plan:
@@ -35,11 +44,24 @@ jobs:
         with:
           terraform_version: 1.10.5
 
-      - name: Azure Login
+      # Option A: Login via Stored Secrets
+      - name: Azure Secret Login
         uses: azure/login@v2
-        if: ${{ env.AZURE_CREDENTIALS != '' }}
+        if: ${{ github.event.inputs.login_method == 'secrets' || (github.event_name != 'workflow_dispatch' && env.AZURE_CREDENTIALS != '') }}
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Option B: Manual Device Code Login
+      - name: Manual Azure Device Code Login
+        if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.login_method == 'device_code' || github.event.inputs.login_method == '') }}
+        run: |
+          echo "================================================================="
+          echo " MANUAL AZURE LOGIN REQUIRED"
+          echo " Open: https://microsoft.com/devicelogin in your browser"
+          echo " Enter the device code that appears below to complete sign in."
+          echo "================================================================="
+          az login --use-device-code
+          az account show
 
       - name: Terraform Init
         run: |
