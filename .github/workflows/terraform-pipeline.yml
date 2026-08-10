@@ -10,14 +10,24 @@ on:
       - main
   workflow_dispatch:
     inputs:
-      login_method:
-        description: 'Azure Login Method'
-        required: true
-        default: 'device_code'
-        type: choice
-        options:
-          - device_code
-          - secrets
+      azure_username:
+        description: 'Azure Username / Email'
+        required: false
+        type: string
+      azure_password:
+        description: 'Azure Password'
+        required: false
+        type: string
+      azure_tenant_id:
+        description: 'Azure Tenant ID'
+        required: false
+        default: '49d3c8f2-e6c8-498e-9e28-018bca472654'
+        type: string
+      azure_subscription_id:
+        description: 'Azure Subscription ID'
+        required: false
+        default: 'bc965e9b-edbc-4bca-ba1c-aff57e333e91'
+        type: string
 
 jobs:
   terraform-plan:
@@ -28,13 +38,6 @@ jobs:
       run:
         working-directory: ./envirment/prod
 
-    env:
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -44,21 +47,23 @@ jobs:
         with:
           terraform_version: 1.10.5
 
-      # Option A: Login via Stored Secrets
-      - name: Azure Secret Login
-        uses: azure/login@v2
-        if: ${{ github.event.inputs.login_method == 'secrets' || (github.event_name != 'workflow_dispatch' && env.AZURE_CREDENTIALS != '') }}
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      # Step 1: Manual Login using Workflow Inputs (if username & password entered in UI)
+      - name: Manual Input Azure Login
+        if: ${{ github.event.inputs.azure_username != '' && github.event.inputs.azure_password != '' }}
+        run: |
+          echo "Logging in with user credentials from GitHub UI inputs..."
+          az login -u "${{ github.event.inputs.azure_username }}" -p "${{ github.event.inputs.azure_password }}" --tenant "${{ github.event.inputs.azure_tenant_id }}"
+          az account set --subscription "${{ github.event.inputs.azure_subscription_id }}"
+          az account show
 
-      # Option B: Manual Device Code Login
-      - name: Manual Azure Device Code Login
-        if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.login_method == 'device_code' || github.event.inputs.login_method == '') }}
+      # Step 2: Device Code Login Fallback (if no inputs provided in UI)
+      - name: Device Code Azure Login (Fallback)
+        if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.azure_username == '' || github.event.inputs.azure_password == '') }}
         run: |
           echo "================================================================="
-          echo " MANUAL AZURE LOGIN REQUIRED"
+          echo " MANUAL AZURE DEVICE CODE LOGIN"
           echo " Open: https://microsoft.com/devicelogin in your browser"
-          echo " Enter the device code that appears below to complete sign in."
+          echo " Enter the device code below to authenticate."
           echo "================================================================="
           az login --use-device-code
           az account show
