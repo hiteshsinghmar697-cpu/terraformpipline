@@ -23,46 +23,53 @@ on:
 jobs:
   terraform:
     name: Terraform Pipeline
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./envirment/prod
-        shell: powershell
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Check Azure Login Status
-        run: |
-          Write-Host "Verifying Azure CLI session..."
-          az account show
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - name: Azure Login
+        uses: azure/login@v2
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Terraform Init
         run: |
-          Write-Host "Initializing Terraform..."
+          echo "Initializing Terraform..."
           terraform init
 
       - name: Terraform Format & Validate
         run: |
-          Write-Host "Validating Terraform configuration..."
+          echo "Validating Terraform configuration..."
           terraform fmt -check=false
           terraform validate
 
       - name: Terraform Plan
         if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan') || (github.event_name == 'push') }}
         run: |
-          Write-Host "Running Terraform Plan..."
+          echo "Running Terraform Plan..."
           terraform plan
 
       - name: Terraform Apply
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply' }}
         run: |
-          Write-Host "Running Terraform Apply..."
+          echo "Running Terraform Apply..."
           terraform apply -auto-approve
 
       - name: Terraform Destroy
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy' }}
         run: |
-          Write-Host "Running Terraform Destroy..."
+          echo "Running Terraform Destroy..."
           terraform destroy -auto-approve
