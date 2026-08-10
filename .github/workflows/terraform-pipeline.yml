@@ -1,4 +1,4 @@
-name: Terraform Pipeline
+name: Terraform CI/CD Pipeline
 
 on:
   push:
@@ -19,15 +19,27 @@ on:
           - plan
           - apply
           - destroy
+      environment:
+        description: 'Target Environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
 
 jobs:
   terraform:
-    name: Terraform Pipeline
+    name: Terraform Pipeline (${{ github.event.inputs.environment || 'prod' }})
     runs-on: ubuntu-latest
-    
+
     defaults:
       run:
-        working-directory: ./envirment/prod
+        working-directory: ./envirment/${{ github.event.inputs.environment || 'prod' }}
 
     env:
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -36,45 +48,63 @@ jobs:
       ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
+      - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.5
 
-      - name: Azure CLI Login (Optional OIDC / Credentials)
+      - name: Azure CLI Login (Service Principal / Credentials)
         uses: azure/login@v2
         if: ${{ secrets.AZURE_CREDENTIALS != '' }}
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Terraform Init
+        id: init
         run: |
-          echo "Initializing Terraform..."
+          echo "=== Initializing Terraform ==="
           terraform init
 
-      - name: Terraform Format & Validate
+      - name: Terraform Validate
+        id: validate
         run: |
-          echo "Validating Terraform configuration..."
-          terraform fmt -check=false
+          echo "=== Validating Terraform Configuration ==="
           terraform validate
 
+      - name: Terraform Format Check
+        id: fmt
+        run: |
+          echo "=== Checking Terraform Formatting ==="
+          terraform fmt -check=false
+
       - name: Terraform Plan
+        id: plan
         if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan') || (github.event_name == 'push') }}
         run: |
-          echo "Running Terraform Plan..."
-          terraform plan
+          echo "=== Running Terraform Plan ==="
+          terraform plan -out=tfplan
+
+      - name: Upload Terraform Plan Artifact
+        uses: actions/upload-artifact@v4
+        if: ${{ steps.plan.outcome == 'success' }}
+        with:
+          name: tfplan-${{ github.event.inputs.environment || 'prod' }}
+          path: ./envirment/${{ github.event.inputs.environment || 'prod' }}/tfplan
+          retention-days: 7
 
       - name: Terraform Apply
+        id: apply
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply' }}
         run: |
-          echo "Running Terraform Apply..."
+          echo "=== Executing Terraform Apply ==="
           terraform apply -auto-approve
 
       - name: Terraform Destroy
+        id: destroy
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy' }}
         run: |
-          echo "Running Terraform Destroy..."
+          echo "=== Executing Terraform Destroy ==="
           terraform destroy -auto-approve
