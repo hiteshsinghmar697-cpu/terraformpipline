@@ -13,33 +13,44 @@ on:
 jobs:
   terraform-plan:
     name: Terraform Init & Plan
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     defaults:
       run:
         working-directory: ./envirment/prod
-        shell: powershell
+
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Verify Azure Login
-        run: |
-          Write-Host "Checking Azure Login Status..."
-          az account show
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - name: Azure Login
+        uses: azure/login@v2
+        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Terraform Init
         run: |
-          Write-Host "Initializing Terraform..."
+          echo "Initializing Terraform..."
           terraform init
 
       - name: Terraform Validate
         run: |
-          Write-Host "Validating Terraform Configuration..."
+          echo "Validating Terraform Configuration..."
           terraform validate
 
       - name: Terraform Plan
         run: |
-          Write-Host "Running Terraform Plan..."
+          echo "Running Terraform Plan..."
           terraform plan
