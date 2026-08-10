@@ -24,6 +24,7 @@ jobs:
       ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
 
     steps:
       - name: Checkout Code
@@ -36,7 +37,7 @@ jobs:
 
       - name: Azure Login
         uses: azure/login@v2
-        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        if: ${{ env.AZURE_CREDENTIALS != '' }}
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
